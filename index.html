@@ -3,93 +3,139 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Life Cal</title>
+    <title>Chelambra Prayer Dashboard</title>
     <style>
         :root {
-            --bg: #000000;
-            --text: #ffffff;
-            --accent: #007AFF;
+            --emerald: radial-gradient(circle at center, #004d2e 0%, #002616 100%);
+            --gold: #D4AF37;
+            --white: #F5F5F5;
         }
         body {
             margin: 0; padding: 0;
-            background: var(--bg);
-            color: var(--text);
-            font-family: -apple-system, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            /* Dynamic sizing based on URL */
+            background: var(--emerald);
+            color: var(--white);
+            font-family: -apple-system, system-ui, sans-serif;
             width: 100vw; height: 100vh;
+            display: flex; flex-direction: column; align-items: center;
             overflow: hidden;
         }
-
-        /* 25% Top Margin for iPhone Clock */
-        .spacer { height: 25%; width: 100%; }
-
-        .container {
-            width: 85%;
-            display: flex;
-            flex-direction: column;
-            gap: 30px;
-        }
-
-        .label { font-size: 32px; color: #888; text-transform: uppercase; letter-spacing: 2px; }
-        .goal-name { font-size: 80px; font-weight: 800; color: var(--accent); margin-top: -10px; }
         
-        .countdown { font-size: 120px; font-weight: 900; }
-        .days-text { font-size: 40px; color: #888; margin-top: -20px; }
+        .spacer { height: 23%; } /* Clock Space */
 
-        .progress-container {
-            width: 100%; height: 15px;
-            background: #222; border-radius: 10px;
-            margin-top: 20px;
+        /* Header with Hijri Date */
+        .hijri-date { font-size: 32px; color: var(--gold); font-weight: 300; margin-bottom: 20px; }
+
+        .main-card {
+            width: 88%;
+            text-align: center;
+            padding: 40px 10px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            border-radius: 40px;
+            backdrop-filter: blur(8px);
         }
-        .progress-bar {
-            height: 100%; background: var(--accent);
-            border-radius: 10px; transition: width 1s ease;
+
+        .label { font-size: 26px; text-transform: uppercase; letter-spacing: 3px; color: var(--gold); }
+        .prayer-name { font-size: 90px; font-weight: 800; margin: 10px 0; }
+        .countdown { font-size: 110px; font-weight: 200; color: var(--gold); line-height: 1; }
+
+        /* Hadith Section */
+        .hadith-box {
+            width: 80%;
+            margin-top: 40px;
+            padding: 30px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 25px;
+            font-style: italic;
+            text-align: center;
         }
+        .hadith-text { font-size: 28px; line-height: 1.4; opacity: 0.9; }
+        .hadith-source { font-size: 22px; color: var(--gold); margin-top: 15px; font-style: normal; }
+
+        /* Footer List */
+        .list-container { width: 85%; margin-top: auto; margin-bottom: 60px; display: grid; gap: 12px; }
+        .prayer-row {
+            display: flex; justify-content: space-between;
+            padding: 15px 25px; background: rgba(0,0,0,0.2);
+            border-radius: 15px; font-size: 28px;
+        }
+        .active { border: 1px solid var(--gold); color: var(--gold); }
     </style>
 </head>
 <body>
 
     <div class="spacer"></div>
 
-    <div class="container">
-        <div class="label">Target Goal</div>
-        <div id="goal-text" class="goal-name">Loading...</div>
+    <div class="hijri-date" id="hijri">Loading Date...</div>
 
-        <div id="days-count" class="countdown">0</div>
-        <div class="days-text">Days Remaining</div>
-
-        <div class="progress-container">
-            <div id="bar" class="progress-bar" style="width: 0%"></div>
-        </div>
+    <div class="main-card">
+        <div class="label" id="status-label">Next Prayer In</div>
+        <div id="countdown" class="countdown">00:00</div>
+        <div id="active-prayer" class="prayer-name">--</div>
     </div>
 
+    <div class="hadith-box">
+        <div class="hadith-text" id="hadith-text">"Verily, actions are by intentions..."</div>
+        <div class="hadith-source" id="hadith-source">Sahih Bukhari</div>
+    </div>
+
+    <div class="list-container" id="prayer-list"></div>
+
     <script>
-        // Get data from the URL
-        const params = new URLSearchParams(window.location.search);
-        const goal = params.get('goal') || "My Project";
-        const goalDate = new Date(params.get('goal_date') || "2026-12-31");
-        const startDate = new Date(params.get('start_date') || "2026-01-01");
-        const today = new Date();
+        async function init() {
+            // 1. Fetch Prayer Times & Hijri
+            const res = await fetch('https://api.aladhan.com/v1/timingsByCity?city=Kozhikode&country=India&method=3');
+            const data = await res.json();
+            const timings = data.data.timings;
+            const hijri = data.data.date.hijri;
 
-        // Calculate Days
-        const totalDuration = goalDate - startDate;
-        const timePassed = today - startDate;
-        const timeLeft = goalDate - today;
-        
-        const daysLeft = Math.ceil(timeLeft / (1000 * 60 * 60 * 24));
-        const progress = Math.min(100, Math.max(0, (timePassed / totalDuration) * 100));
+            // 2. Fetch Daily Hadith (Randomly from a verified set)
+            try {
+                const hRes = await fetch('https://hadithapi.pages.dev/api/bukhari/1'); // Fetching Hadith #1 as demo
+                const hData = await hRes.json();
+                document.getElementById('hadith-text').innerText = `"${hData.hadith_english.substring(0, 120)}..."`;
+            } catch(e) {}
 
-        // Update DOM
-        document.getElementById('goal-text').innerText = goal;
-        document.getElementById('days-count').innerText = daysLeft > 0 ? daysLeft : 0;
-        document.getElementById('bar').style.width = progress + "%";
-        
-        // Handle custom sizing from URL
-        if(params.get('width')) document.body.style.width = params.get('width') + "px";
-        if(params.get('height')) document.body.style.height = params.get('height') + "px";
+            // Update Hijri
+            document.getElementById('hijri').innerText = `${hijri.day} ${hijri.month.en} ${hijri.year} AH`;
+
+            updatePrayerUI(timings);
+        }
+
+        function updatePrayerUI(timings) {
+            const now = new Date();
+            const order = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"];
+            let next = "", nextTime = null;
+
+            const schedule = order.map(name => {
+                const [h, m] = timings[name].split(':');
+                const d = new Date(); d.setHours(h, m, 0);
+                return { name, time: d };
+            });
+
+            for (let i = 0; i < schedule.length; i++) {
+                if (now < schedule[i].time) {
+                    next = schedule[i].name;
+                    nextTime = schedule[i].time;
+                    break;
+                }
+            }
+            if (!next) { next = "Fajr"; nextTime = new Date(schedule[0].time.getTime() + 86400000); }
+
+            const diff = nextTime - now;
+            const hrs = Math.floor(diff / 3600000);
+            const mins = Math.floor((diff % 3600000) / 60000);
+
+            document.getElementById('countdown').innerText = `${hrs}h ${mins}m`;
+            document.getElementById('active-prayer').innerText = next;
+
+            document.getElementById('prayer-list').innerHTML = order.map(p => `
+                <div class="prayer-row ${p === next ? 'active' : ''}">
+                    <span>${p}</span><span>${timings[p]}</span>
+                </div>
+            `).join('');
+        }
+        init();
     </script>
 </body>
 </html>
