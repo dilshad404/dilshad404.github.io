@@ -3,139 +3,105 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chelambra Prayer Dashboard</title>
+    <title>Prayer Times Table</title>
     <style>
-        :root {
-            --emerald: radial-gradient(circle at center, #004d2e 0%, #002616 100%);
-            --gold: #D4AF37;
-            --white: #F5F5F5;
-        }
         body {
             margin: 0; padding: 0;
-            background: var(--emerald);
-            color: var(--white);
-            font-family: -apple-system, system-ui, sans-serif;
+            background-color: #000000; /* Pure black for OLED */
+            color: #ffffff; /* Pure white text */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             width: 100vw; height: 100vh;
             display: flex; flex-direction: column; align-items: center;
             overflow: hidden;
         }
-        
-        .spacer { height: 23%; } /* Clock Space */
 
-        /* Header with Hijri Date */
-        .hijri-date { font-size: 32px; color: var(--gold); font-weight: 300; margin-bottom: 20px; }
+        /* Safe area for iPhone 15 Pro Clock/Island */
+        .spacer { height: 28%; }
 
-        .main-card {
-            width: 88%;
-            text-align: center;
-            padding: 40px 10px;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(212, 175, 55, 0.3);
-            border-radius: 40px;
-            backdrop-filter: blur(8px);
+        .container {
+            width: 85%;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
         }
 
-        .label { font-size: 26px; text-transform: uppercase; letter-spacing: 3px; color: var(--gold); }
-        .prayer-name { font-size: 90px; font-weight: 800; margin: 10px 0; }
-        .countdown { font-size: 110px; font-weight: 200; color: var(--gold); line-height: 1; }
-
-        /* Hadith Section */
-        .hadith-box {
-            width: 80%;
-            margin-top: 40px;
-            padding: 30px;
-            background: rgba(0,0,0,0.2);
-            border-radius: 25px;
-            font-style: italic;
+        .header {
+            font-size: 32px;
+            font-weight: 300;
+            letter-spacing: 5px;
+            text-transform: uppercase;
+            border-bottom: 1px solid #333;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
             text-align: center;
         }
-        .hadith-text { font-size: 28px; line-height: 1.4; opacity: 0.9; }
-        .hadith-source { font-size: 22px; color: var(--gold); margin-top: 15px; font-style: normal; }
 
-        /* Footer List */
-        .list-container { width: 85%; margin-top: auto; margin-bottom: 60px; display: grid; gap: 12px; }
-        .prayer-row {
-            display: flex; justify-content: space-between;
-            padding: 15px 25px; background: rgba(0,0,0,0.2);
-            border-radius: 15px; font-size: 28px;
+        table {
+            width: 100%;
+            border-collapse: collapse;
         }
-        .active { border: 1px solid var(--gold); color: var(--gold); }
+
+        td {
+            padding: 25px 0;
+            font-size: 48px; /* Large font for lockscreen visibility */
+            font-weight: 500;
+        }
+
+        .prayer-name { text-align: left; }
+        .prayer-time { text-align: right; font-weight: 700; }
+
+        .footer {
+            margin-top: auto;
+            margin-bottom: 80px;
+            font-size: 24px;
+            color: #555;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
 
     <div class="spacer"></div>
 
-    <div class="hijri-date" id="hijri">Loading Date...</div>
-
-    <div class="main-card">
-        <div class="label" id="status-label">Next Prayer In</div>
-        <div id="countdown" class="countdown">00:00</div>
-        <div id="active-prayer" class="prayer-name">--</div>
+    <div class="container">
+        <div class="header" id="date-label">Today's Times</div>
+        <table id="prayer-table">
+            </table>
     </div>
 
-    <div class="hadith-box">
-        <div class="hadith-text" id="hadith-text">"Verily, actions are by intentions..."</div>
-        <div class="hadith-source" id="hadith-source">Sahih Bukhari</div>
-    </div>
-
-    <div class="list-container" id="prayer-list"></div>
+    <div class="footer">Chelambra, Kozhikode</div>
 
     <script>
-        async function init() {
-            // 1. Fetch Prayer Times & Hijri
-            const res = await fetch('https://api.aladhan.com/v1/timingsByCity?city=Kozhikode&country=India&method=3');
-            const data = await res.json();
-            const timings = data.data.timings;
-            const hijri = data.data.date.hijri;
+        function convertTo12Hour(time24) {
+            let [hours, minutes] = time24.split(':');
+            let modifier = +hours >= 12 ? 'PM' : 'AM';
+            hours = (+hours % 12) || 12;
+            return `${hours}:${minutes} ${modifier}`;
+        }
 
-            // 2. Fetch Daily Hadith (Randomly from a verified set)
+        async function getTimes() {
             try {
-                const hRes = await fetch('https://hadithapi.pages.dev/api/bukhari/1'); // Fetching Hadith #1 as demo
-                const hData = await hRes.json();
-                document.getElementById('hadith-text').innerText = `"${hData.hadith_english.substring(0, 120)}..."`;
-            } catch(e) {}
+                const res = await fetch('https://api.aladhan.com/v1/timingsByCity?city=Kozhikode&country=India&method=3');
+                const data = await res.json();
+                const timings = data.data.timings;
+                
+                const prayers = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"];
+                const table = document.getElementById('prayer-table');
+                
+                table.innerHTML = prayers.map(p => `
+                    <tr>
+                        <td class="prayer-name">${p}</td>
+                        <td class="prayer-time">${convertTo12Hour(timings[p])}</td>
+                    </tr>
+                `).join('');
 
-            // Update Hijri
-            document.getElementById('hijri').innerText = `${hijri.day} ${hijri.month.en} ${hijri.year} AH`;
-
-            updatePrayerUI(timings);
-        }
-
-        function updatePrayerUI(timings) {
-            const now = new Date();
-            const order = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"];
-            let next = "", nextTime = null;
-
-            const schedule = order.map(name => {
-                const [h, m] = timings[name].split(':');
-                const d = new Date(); d.setHours(h, m, 0);
-                return { name, time: d };
-            });
-
-            for (let i = 0; i < schedule.length; i++) {
-                if (now < schedule[i].time) {
-                    next = schedule[i].name;
-                    nextTime = schedule[i].time;
-                    break;
-                }
+                document.getElementById('date-label').innerText = data.data.date.readable;
+            } catch (e) {
+                document.getElementById('date-label').innerText = "Error Loading Times";
             }
-            if (!next) { next = "Fajr"; nextTime = new Date(schedule[0].time.getTime() + 86400000); }
-
-            const diff = nextTime - now;
-            const hrs = Math.floor(diff / 3600000);
-            const mins = Math.floor((diff % 3600000) / 60000);
-
-            document.getElementById('countdown').innerText = `${hrs}h ${mins}m`;
-            document.getElementById('active-prayer').innerText = next;
-
-            document.getElementById('prayer-list').innerHTML = order.map(p => `
-                <div class="prayer-row ${p === next ? 'active' : ''}">
-                    <span>${p}</span><span>${timings[p]}</span>
-                </div>
-            `).join('');
         }
-        init();
+
+        getTimes();
     </script>
 </body>
 </html>
